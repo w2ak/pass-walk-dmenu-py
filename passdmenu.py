@@ -38,7 +38,7 @@ def parse_args():
                     action='count', default=0,
                     help='increase verbosity')
     p.add_argument('-l', '--log-file', dest='log',
-                    type=ap.FileType('a'), default=sys.stderr,
+                    type=ap.FileType('w'), default=sys.stderr,
                     metavar='<file>', help='log file')
     p.add_argument('-t', '--type', dest='type',
                     action='store_true', default=False,
@@ -50,9 +50,6 @@ def parse_args():
             logging.WARNING if a.verb > 0 else \
             logging.ERROR
     logging.basicConfig(stream=a.log, level=lglvl)
-    if a.log is not p.get_default('log'):
-        a.log.write("======== {:} =========".format(
-                    time.asctime(time.localtime(time.time()))))
     return a
 
 if __name__=='__main__':
@@ -63,6 +60,7 @@ if __name__=='__main__':
     bin_pass = which('pass')
     bin_dmenu = which('dmenu')
     bin_xclip = which('xclip')
+    bin_xdotool = which('xdotool')
 
     """
     Get the password store directory from the environment.
@@ -110,8 +108,13 @@ if __name__=='__main__':
     value = content.split('\n')[0].strip()
 
     """
-    Put the value in clipboard.
+    Output the value.
     """
-    cmd_xclip = [ bin_xclip, '-i', '-selection', 'clipboard' ]
-    justrun(cmd_xclip, input=value)
-    lg.info("Secret copied to clipboard.")
+    if args.type:
+        cmd_type = [ bin_xdotool, 'type', '--clearmodifiers', '--file', '-' ]
+        justrun(cmd_type, input=value)
+        lg.info("Secret typed in window.")
+    else:
+        cmd_xclip = [ bin_xclip, '-i', '-selection', 'clipboard' ]
+        justrun(cmd_xclip, input=value)
+        lg.info("Secret copied to clipboard.")
