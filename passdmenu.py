@@ -85,10 +85,10 @@ def field_cmp(x, y):
     return 0
 
 def getkeys_dict(d):
-    return list(d)
+    return sorted(list(d), key=field_cmp)
 
 def getchoices_dictkeys(d,k):
-    return sorted(list(map(str,k)), key=field_cmp)
+    return list(map(str,k))
 
 def getkeys_list(l):
     return list(range(len(l)))
