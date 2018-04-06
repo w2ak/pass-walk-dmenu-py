@@ -15,14 +15,20 @@ def which(prog):
 
 def getoutput(args, input='', check=True):
     result = subprocess.run(args,
-                            input=input.encode('ascii'),
+                            input=input.encode('utf-8'),
                             check=check,
                             stdout=subprocess.PIPE)
-    output = result.stdout.decode('ascii')
+    output = result.stdout.decode('utf-8')
     if check:
         return output
     else:
         return output, result.returncode
+
+def justrun(args, input='', check=True):
+    result = subprocess.run(args,
+                            input=input.encode('utf-8'),
+                            check=check)
+    return result.returncode
 
 def parse_args():
     p = ap.ArgumentParser(description='Helps you get some password from your\
@@ -56,6 +62,7 @@ if __name__=='__main__':
     args = parse_args()
     bin_pass = which('pass')
     bin_dmenu = which('dmenu')
+    bin_xclip = which('xclip')
 
     """
     Get the password store directory from the environment.
@@ -89,3 +96,22 @@ if __name__=='__main__':
                 msg = "Database entry choice failed with rc {:d}.".format(rc))
     entry = entry.strip()
     lg.info("Chosen database entry:'{:}'".format(entry))
+
+    """
+    Get password file contents.
+    """
+    cmd_pass = [ bin_pass, entry ]
+    content = getoutput(cmd_pass)
+    lg.info("Password file contents stored.")
+
+    """
+    Get desired value.
+    """
+    value = content.split('\n')[0].strip()
+
+    """
+    Put the value in clipboard.
+    """
+    cmd_xclip = [ bin_xclip, '-i', '-selection', 'clipboard' ]
+    justrun(cmd_xclip, input=value)
+    lg.info("Secret copied to clipboard.")
