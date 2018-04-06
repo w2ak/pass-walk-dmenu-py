@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import argparse as ap
-import yaml
+import yaml, json
 import logging, sys, time, os, glob, shutil, subprocess, functools
 lg = logging.getLogger(__name__)
 
@@ -96,6 +96,24 @@ def getkeys_list(l):
 def getchoices_listkeys(l,k):
     return list(map(lambda x: '#{:d} ({:})'.format(x,str(l[x])[:10]),k))
 
+def full_cache(keys,values):
+    return { k: values.get(k,0) for k in keys }
+
+def get_cache(cf, keys):
+    try:
+        with open(cf,'r') as f:
+            cache = json.load(f)
+    except Exception:
+        cache = dict()
+    return full_cache(keys, cache)
+
+def put_cache(cf, cache=dict()):
+    with open(cf,'w') as f:
+        json.dump({ k: v for k,v in cache.items() if v > 0 }, f,
+                    separators=(',',':'),
+                    sort_keys=True,
+                    skipkeys=True)
+
 """
 Get binary paths.
 """
@@ -104,10 +122,13 @@ bin_pass = which('pass')
 bin_dmenu = which('dmenu')
 bin_xclip = which('xclip')
 bin_xdotool = which('xdotool')
+bin_mkdir = which('mkdir')
 
 def dmenu_choice(choices, prefix=''):
+    lg.debug("DmenuChoice:{:}".format(choices))
     cmd_dmenu = [ bin_dmenu, '-p', prefix ]
-    choice = getoutput(cmd_dmenu, input='\n'.join(choices))
+    choice = getoutput(cmd_dmenu, input='\n'.join(choices)).strip()
+    lg.debug("DmenuChoiceOutput:{:}".format(choice))
     try:
         return choices.index(choice)
     except ValueError:
@@ -129,9 +150,11 @@ def walk_object(o, prefixes=list(),getkeys=list,
 
 def walk(o, prefixes=list()):
     if isinstance(o,dict):
+        lg.debug("WalkDict:{:}".format({k:'***' for k in o}))
         return walk_object(o, prefixes=prefixes,
                 getkeys=getkeys_dict, getchoices=getchoices_dictkeys)
     if isinstance(o,list):
+        lg.debug("WalkList:{:}".format(o))
         return walk_object(o, prefixes=prefixes,
                 getkeys=getkeys_list, getchoices=getchoices_listkeys)
     return o
@@ -145,6 +168,16 @@ def parse_pass_contents(contents):
 
 if __name__=='__main__':
     args = parse_args()
+
+    """
+    Get the cache directory from the environment.
+    """
+    progname = 'passdmenu'
+    cache_dir = os.path.expanduser('~/.cache')
+    cache_dir = os.getenv('XDG_CACHE_HOME', cache_dir)
+    cmd_mkdir = [ bin_mkdir, '-p', cache_dir ]
+    justrun(cmd_mkdir)
+    cache_file = os.path.join(cache_dir,progname)
 
     """
     Get the password store directory from the environment.
@@ -167,6 +200,14 @@ if __name__=='__main__':
     lg.info("Found {:d} options in password store.".format(len(options)))
 
     """
+    Get the entry use counters.
+    """
+    cache = get_cache(cache_file, options)
+    weighted = [ (-cache[opt],opt) for opt in cache ]
+    weighted.sort()
+    options = [ y for (x,y) in weighted ]
+
+    """
     Get database entry name.
     """
     cmd_dmenu = [ bin_dmenu ]
@@ -178,7 +219,6 @@ if __name__=='__main__':
                 msg = "Database entry choice failed with rc {:d}.".format(rc))
     entry = entry.strip()
     lg.info("Chosen database entry:'{:}'".format(entry))
-
     """
     Get password file contents.
     """
@@ -193,6 +233,14 @@ if __name__=='__main__':
     """
     value = walk(content)
     lg.info("Desired value obtained.")
+
+
+    """
+    Update the entry use counters.
+    """
+    cache[entry] = cache.get(entry,0)+1
+    put_cache(cache_file, cache)
+    lg.info("Use counters updated.")
 
     """
     Output the value.
