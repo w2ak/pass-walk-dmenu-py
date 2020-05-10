@@ -160,7 +160,7 @@ def walk(o, prefixes=list()):
     return o
 
 def parse_pass_contents(contents):
-    sedscript = "1 s/^(.*)$/password: \"\\1\"/; 2,$ s/^(.*): ([^-].*)$/\\1: \"\\2\"/; /^otpauth/ s/^/otpauth: /;"
+    sedscript = "1 s/^(.*)$/password: \"\\1\"/; 2,$ s/^(.*): ([^-].*)$/\\1: \"\\2\"/; /^otpauth/ s/^/otpauth: /; s/\\\\/\\\\\\\\/g;"
     cmd_sed = [ bin_sed, '-r', sedscript ]
     result = getoutput(cmd_sed, input=contents)
     yobj = yaml.load(result)
